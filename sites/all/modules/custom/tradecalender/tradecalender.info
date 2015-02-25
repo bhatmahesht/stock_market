@@ -1,0 +1,4 @@
+name = Trade Calender
+description = Information about trading days in the exchange
+core = 7.x
+version = 7.1

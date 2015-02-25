@@ -1,0 +1,254 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/*
+ * implements hook help
+ */
+
+function tradecalender_help($path) {
+  
+}
+
+/*
+ * implements hook permission
+ */
+
+function tradecalender_permission() {
+  return array(
+    'administer tradecalender' => array(
+      'title' => 'Administer Trade Calender',
+      'description' => 'Allow valid dates of trade',
+    )
+  );
+}
+
+/*
+ * implement hook menu
+ */
+
+function tradecalender_menu() {
+
+  $items['tradecalender'] = array(
+    'title' => 'Choose Valid Trade Dates',
+    'description' => 'Enable valid trade dates by enabling checkboxes',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('tradecalender_valid_dates', 1),
+    'access arguments' => array('administer tradecalender'),
+  );
+
+  $items['tradecalender/test/display'] = array(
+    'title' => 'tradecalender test',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('tradecalender_test_display'),
+    'access arguments' => array('administer tradecalender'),
+  );
+
+  $items['tradecalender/test/form'] = array(
+    'title' => 'tradecalender test form',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('tradecalender_test_form'),
+    'access arguments' => array('administer tradecalender'),
+  );
+
+
+  return $items;
+}
+
+/*
+ * page callback for tradecalender
+ */
+
+function tradecalender_valid_dates($form, &$form_state, $year = 0) {
+  if ($year == 0) {
+    $now = time();
+    $year = date('Y', $now);
+  }
+  $mintime = '01-01-' . $year . '';
+  $mintimestamp = strtotime($mintime);
+
+  $maxtime = '31-12-' . $year . '';
+  $maxtimestamp = strtotime($maxtime);
+
+  $dates = db_select('tradecalender', 'tc')
+          ->fields('tc')
+          ->condition('trddate', $mintimestamp, '>=')
+          ->condition('trddate', $maxtimestamp, '<=')
+          ->orderBy('trddate')
+          ->execute()
+          ->fetchAllAssoc('trddate', PDO::FETCH_ASSOC);
+  if (empty($dates)) {
+    $dates = _tradecalender_get_new_dates($year);
+  }
+
+  $header = array(
+    'date' => 'Date',
+    'week' => 'Day'
+  );
+  $rows = array();
+  $values = array();
+
+  foreach ($dates as $trddate => $dt) {
+    $rows[$trddate] = array(
+      'date' => date('d-m-Y', $trddate),
+      'week' => date('D', $trddate),
+    );
+    $values[$trddate] = $dt['isvalid'];
+  }
+
+
+  $form['tradedates'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $rows,
+    '#default_value' => $values,
+    '#empty' => 'No dates available'
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+  return $form;
+}
+
+/*
+ * submit handler for tradecalender_valid_dates
+ */
+
+function tradecalender_valid_dates_submit($form, &$form_state) {
+  $dates = $form_state['values']['tradedates'];
+  dpm($form_state['values']['tradedates']);
+
+  foreach ($dates as $trddate => $value) {
+    if ($value > 0) {
+      $value = 1;
+    }
+    $result = db_merge('tradecalender')
+            ->key(array('trddate' => $trddate))
+            ->fields(array(
+              'trddate' => $trddate,
+              'isvalid' => $value,
+            ))
+            ->execute();
+  }
+}
+
+/*
+ * helper function to get new calender dates for year
+ */
+
+function _tradecalender_get_new_dates($year) {
+  $mintime = '01-01-' . $year . '';
+  $mintimestamp = strtotime($mintime);
+
+  $maxtime = '31-12-' . $year . '';
+  $maxtimestamp = strtotime($maxtime);
+
+  $rows = array();
+
+  $date = $mintimestamp;
+
+  for ($date = $mintimestamp; $date <= $maxtimestamp; $date = strtotime('+1 day', $date)) {
+    $value = 1;
+    if (date('D', $date) == 'Sat' or date('D', $date) == 'Sun') {
+      $value = 0;
+    }
+    $rows[$date] = array(
+      'trddate' => $date,
+      'isvalid' => $value,
+    );
+  }
+
+  return $rows;
+}
+
+/*
+ * callback for tradecalender/test/display
+ */
+
+function tradecalender_test_display($form, &$form_state) {
+
+
+  $header = array(
+    'name' => 'Name',
+    'phone' => 'Phone',
+    'remark' => 'Remark',
+  );
+
+  $rows = array(
+    'balu' => array(
+      'name' => 'Balu',
+      'phone' => '9986143131',
+      'remark' => '',
+    ),
+    'mahesh' => array(
+      'name' => 'Mahesh',
+      'phone' => '9008727280',
+      'remark' => '',
+    ),
+  );
+
+  $form['table'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $rows,
+    '#default_value' => array('balu' => 12),
+    '#empty' => 'No content available',
+  );
+
+  $form['test'] = array(
+    '#type' => 'value',
+    '#value' => drupal_get_form('tradecalender_test_form'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+  return $form;
+}
+
+/*
+ * submit function for tradecalender_test_display form
+ */
+
+function tradecalender_test_display_submit($form, &$form_state) {
+
+  dpm($form_state['values']['table']);
+}
+
+/*
+ * Implements trade calender test form
+ */
+
+function tradecalender_test_form($form, &$form_state) {
+
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Enter your name',
+  );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+    
+  if (isset($form_state['values']['name'])) {
+    $name = $form_state['values']['name'];
+    $form['welcome'] = array(
+      '#markup' => "Welcome $name",
+    );
+  }
+  return $form;
+}
+
+function tradecalender_test_form_submit($form, &$form_state) {
+    $form_state['rebuild'] = TRUE;
+}

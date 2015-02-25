@@ -1,0 +1,4 @@
+name = nsedata
+description = extract nse data into database
+core = 7.x
+version = 7.1

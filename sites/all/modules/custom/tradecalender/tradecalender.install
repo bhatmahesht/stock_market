@@ -1,0 +1,38 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+/*
+ * Implements hook schema
+ */
+
+function tradecalender_schema() {
+
+  $schema['tradecalender'] = array(
+    'description' => 'Stores the trading days',
+    'fields' => array(
+      'trddate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'description' => 'valid Trading days',
+      ),
+      'isvalid' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'description' => 'Stores weather trade date is valid or not'
+      ),
+      'remarks' => array(
+        'type' => 'varchar',
+        'length' => 100,
+        'description' => 'remarks about trading days'
+      ),
+    ),
+    'primary key' => array('trddate'),
+  );
+
+  return $schema;
+}

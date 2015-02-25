@@ -1,0 +1,286 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/*
+ * Implements hook help
+ */
+
+function bhavcopydownload_help($path) {
+  
+}
+
+/*
+ * Implements hook permission
+ */
+
+function bhavcopydownload_permission() {
+  return array(
+    'administer bhavcopydownload' => array(
+      'title' => 'Administer bhavcopy download',
+      'description' => 'Shows the bhavcopy downloaded files',
+    )
+  );
+}
+
+/*
+ * implement hook menu
+ */
+
+function bhavcopydownload_menu() {
+
+  $items['bhavcopydownload/display/%bhavtype'] = array(
+    'title' => 'List of bhavcopy downloaded',
+    'description' => 'Shows the bhavcopy files downloaded till now',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('bhavcopydownload_display', 2),
+    'access arguments' => array('administer bhavcopydownload'),
+  );
+
+
+  return $items;
+}
+
+/*
+ * page callback for bhacopydownload/display
+ */
+
+function bhavcopydownload_display($form, &$form_state, $bhavtype) {
+  
+}
+
+/*
+ * implements bhavcopy types . Gets array of bhavcopy type details
+ */
+
+function bhavcopydownload_types() {
+  $types = module_invoke_all('bhavcopytypes');
+//  $types['nsedata'] = array(
+//    'base Url' => 'http://www.nseindia.com/content/historical/EQUITIES/',
+//    'base Dir' => 'nsedata',
+//    'url callback' => 'bhavcopydownload_nsedata_url',
+//    'newfile callback' => 'bhavcopydownload_nsedata_newfile',
+//    'display callback' => 'bhavcopydownload_nsedata_display',
+//  );
+
+  return $types;
+}
+
+/*
+ * Helper function to download from remote location
+ */
+
+function _bhavcopydownload_curldownload($downloadUrl, $newFileName) {
+
+  $out = fopen($newFileName, 'wb');
+  if ($out == FALSE) {
+    drupal_set_message("File $newFileName not opened");
+  }
+
+  $ch = curl_init();
+
+  curl_setopt($ch, CURLOPT_FILE, $out);
+  curl_setopt($ch, CURLOPT_HEADER, 0);
+  curl_setopt($ch, CURLOPT_URL, $downloadUrl);
+  curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.2) Gecko/20090729 Firefox/3.5.2 GTB5');
+  $success = curl_exec($ch);
+  curl_close($ch);
+  return $success;
+}
+
+/*
+ * Implements hook cron
+ */
+
+function bhavcopydownload_cron() {
+  $bhavtypes = bhavcopydownload_types();
+
+  foreach ($bhavtypes as $bhavname => $bhavtype) {
+    $bhavtype['bhavtype'] = $bhavname;
+    $bhavtypeid = _bhavcopydownload_getbhavtypeid($bhavtype);
+    $bhavDate = _bhavcopydownload_downloaddate($bhavtypeid);
+    $urlcall = $bhavtype['url callback'];
+    $newcall = $bhavtype['newfile callback'];
+    $baseUrl = $bhavtype['base Url'];
+    $baseDir = $bhavtype['base Dir'];
+
+    $downloadUrl = $urlcall($baseUrl, $bhavDate);
+    $newFileName = $newcall($baseDir, $bhavDate);
+
+    $success = _bhavcopydownload_curldownload($downloadUrl, $newFileName);
+
+    $return = db_insert('bhavcopydownload')
+            ->fields(array(
+              'bhavtypeid' => $bhavtypeid,
+              'bhavfilename' => $downloadUrl,
+              'bhavstoredfilename' => $newFileName,
+              'bhavdate' => $bhavDate,
+              'bhavdownloadeddate' => time(),
+              'success' => $success,
+            ))
+            ->execute();
+    $loadurl = $bhavtype['load callback'];
+    $loadurl($bhavDate, $newFileName, $baseDir);
+  }
+}
+
+/*
+ * url callback for bhavtype nsedata
+ */
+
+function bhavcopydownload_nsedata_url($baseUrl, $bhavDate) {
+
+  $year = date('Y', $bhavDate);
+  $month = strtoupper(date('M', $bhavDate));
+  $day = date('d', $bhavDate);
+
+  $addedUrl = "$year/$month/cm$day$month$year" . "bhav.csv.zip";
+  $downloadUrl = $baseUrl . $addedUrl;
+  return $downloadUrl;
+}
+
+function bhavcopydownload_nsedata_newfile($baseDir, $bhavDate) {
+  $year = date('Y', $bhavDate);
+  $month = strtoupper(date('M', $bhavDate));
+  $day = date('d', $bhavDate);
+
+  $localDirectory = variable_get('file_public_path', conf_path() . '/files/') . "$baseDir/";
+  $newFileName = $localDirectory . "cm$day$month$year" . "bhav.csv.zip";
+  return $newFileName;
+}
+
+/*
+ * Find out the download date for the bhavcopy
+ */
+
+function bhavcopydownload_downloadDate($bhavtype) {
+  $bhavDate = time();
+  $query = db_select('bhavcopydownload', 'bwd');
+  $query->addExpression('MAX(bwd.bhavdate)', 'max_bhavdate');
+  $query->addExpression('MIN(bwd.bhavdate)', 'min_bhavdate');
+  $query = $query->condition('bwd.bhavtype', $bhavtype);
+  $result = $query->execute()->fetch();
+
+  if (is_null($result->max_bhavdate)) {
+    $today = date('d-m-Y', REQUEST_TIME);
+    $today = strtotime($today);
+    $yesterday = strtotime('-1 day', $today);
+    $bhavDate = $yesterday;
+  } else {
+    $max_bhavdate = date('d-m-Y', $result->max_bhavdate);
+    $max_bhavdate = strtotime($max_bhavdate);
+    $min_bhavdate = date('d-m-Y', $result->min_bhavdate);
+    $min_bhavdate = strtotime($min_bhavdate);
+    $today = date('d-m-Y', REQUEST_TIME);
+    $today = strtotime($today);
+    $yesterday = strtotime('-1 day', $today);
+
+    if ($max_bhavdate < $yesterday) {
+
+      $bhavDate = strtotime('+1 day', $max_bhavdate);
+    } else {
+      $bhavDate = strtotime('-1 day', $min_bhavdate);
+    }
+  }
+  return $bhavDate;
+}
+
+function _bhavcopydownload_downloaddate($bhavtypeid) {
+
+  $now = time();
+  $yesterday = strtotime('-1 day', $now);
+
+  $upperbhavdate = bhavcopydownload_upperdownloaddate($bhavtypeid);
+  if ($upperbhavdate < $yesterday && $upperbhavdate != 0) {
+    return $upperbhavdate;
+  } else {
+    $lowerbhavdate = bhavcopydownload_lowerdownloaddate($bhavtypeid);
+    if ($lowerbhavdate == 0) {
+      return 0;
+    } else {
+      return $lowerbhavdate;
+    }
+  }
+}
+
+/*
+ * upper download date from tradecalender
+ */
+
+function bhavcopydownload_upperdownloaddate($bhavtypeid) {
+  $query = db_select('bhavcopydownload', 'bwd');
+  $query->addExpression('MAX(bwd.bhavdate)', 'maxbhavdate');
+  $query->condition('bwd.bhavtypeid', $bhavtypeid, '=');
+  $result = $query->execute()->fetchAssoc();
+
+  $maxbhavdate = $result['maxbhavdate'];
+
+  $query = db_select('tradecalender', 'trdc');
+  $query->addField('trdc', 'trddate');
+  $query->condition('trdc.trddate', $maxbhavdate, '>');
+  $query->condition('trdc.isvalid', 1);
+  //$query->orderBy('trdc.trddate', 'DESC');
+  $result = $query->execute()->fetchAssoc();
+  $upperbhavdate = $result['trddate'];
+  if (is_null($upperbhavdate)) {
+    return 0;
+  } else {
+    return $upperbhavdate;
+  }
+}
+
+/*
+ * lower download date from tradecalender
+ */
+
+function bhavcopydownload_lowerdownloaddate($bhavtypeid) {
+  $query = db_select('bhavcopydownload', 'bwd');
+  $query->addExpression('MIN(bwd.bhavdate)', 'minbhavdate');
+  $query->condition('bwd.bhavtypeid', $bhavtypeid);
+  $result = $query->execute()->fetchAssoc();
+
+  $minbhavdate = $result['minbhavdate'];
+
+  if (is_null($minbhavdate)) {
+    $yesterday = strtotime('-1 day', time());
+    $minbhavdate = $yesterday;
+  }
+  $query = db_select('tradecalender', 'trdc');
+  $query->addField('trdc', 'trddate');
+  $query->condition('trdc.trddate', $minbhavdate, '<');
+  $query->condition('trdc.isvalid', 1);
+  $query->orderBy('trdc.trddate', 'DESC');
+  $query->range(0, 1);
+  $result = $query->execute()->fetchAssoc();
+
+  $lowerbhavdate = $result['trddate'];
+  if (is_null($lowerbhavdate)) {
+    return 0;
+  } else {
+    return $lowerbhavdate;
+  }
+}
+
+function _bhavcopydownload_getbhavtypeid($bhavtype) {
+  $query = db_select('bhavtypes', 'bs');
+  $query->addField('bs', 'id');
+  $query->condition('bs.type', $bhavtype['bhavtype']);
+  $result = $query->execute()->fetchAssoc();
+
+  if (!$result) {
+    db_insert('bhavtypes')
+            ->fields(array(
+              'type' => $bhavtype['bhavtype'],
+              'description' => '',
+                    )
+            )->execute();
+
+    return _bhavcopydownload_getbhavtypeid($bhavtype);
+  } else {
+    return $result['id'];
+  }
+}

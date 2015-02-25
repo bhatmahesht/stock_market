@@ -1,0 +1,412 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/*
+ * implements hook help
+ */
+
+function nsedata_help($path) {
+
+  $output = "";
+  switch ($path) {
+    case '/nsedata/display':
+      $output = "Displays nsedata for each stock";
+  }
+  return $output;
+}
+
+/*
+ * Implements hook permission
+ */
+
+function nsedata_permission() {
+  return array(
+    'administer nsedata' => array(
+      'title' => 'Administer NSE data',
+      'description' => 'Administer managing nse data',
+    ),
+  );
+}
+
+/*
+ * Implements hook menu
+ */
+
+function nsedata_menu() {
+  $items['nsedata/display/%nsedata_symbol'] = array(
+    'title' => 'Displays nse data for symbol',
+    'page callback' => 'nsedata_display',
+    'page arguments' => array(2),
+    'access arguments' => array('administer nsedata'),
+  );
+
+  $items['nsedata/trade/%nsedata_symbol'] = array(
+    'title' => 'Make trade in the following dates',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsedata_trade', 2),
+    'access arguments' => array('administer nsedata'),
+  );
+
+  return $items;
+}
+
+/*
+ *  Displays nse data symbol loads id
+ */
+
+function nsedata_symbol_load($symbol) {
+  $query = db_select('nsesymbols', 'ns');
+  $query->addField('ns', 'id');
+  $query->condition('symbol', $symbol);
+  $result = $query->execute()->fetchAssoc();
+  return $result['id'];
+}
+
+/*
+ * 
+ */
+
+function nsedata_display($nsedata_symbol) {
+  $query = db_select('nsedata', 'nd');
+  $query->fields('nd');
+  $query->condition('symbolid', $nsedata_symbol);
+  $result = $query->execute()->fetchAllAssoc('trddate', PDO::FETCH_ASSOC);
+  return theme('table', array('rows' => $result));
+}
+
+/*
+ * Implements hook bhavcopytypes
+ */
+
+function nsedata_bhavcopytypes() {
+
+  $types['nsedata'] = array(
+    'base Url' => 'http://www.nseindia.com/content/historical/EQUITIES/',
+    'base Dir' => 'nsedata',
+    'url callback' => 'nsedata_url',
+    'newfile callback' => 'nsedata_newfile',
+    'load callback' => 'nsedata_loaddata',
+  );
+
+  return $types;
+}
+
+/*
+ * implements url callback for nsedata url
+ */
+
+function nsedata_url($baseUrl, $bhavDate) {
+  $year = date('Y', $bhavDate);
+  $month = strtoupper(date('M', $bhavDate));
+  $day = date('d', $bhavDate);
+
+  $addedUrl = "$year/$month/cm$day$month$year" . "bhav.csv.zip";
+  $downloadUrl = $baseUrl . $addedUrl;
+  return $downloadUrl;
+}
+
+/*
+ * call back for newfile in nsedata
+ */
+
+function nsedata_newfile($baseDir, $bhavDate) {
+
+  $year = date('Y', $bhavDate);
+  $month = strtoupper(date('M', $bhavDate));
+  $day = date('d', $bhavDate);
+
+  $localDirectory = variable_get('file_public_path', conf_path() . '/files/') . "$baseDir/";
+  $newFileName = $localDirectory . "cm$day$month$year" . "bhav.csv.zip";
+  return $newFileName;
+}
+
+/*
+ * implements look callback for nsedata
+ */
+
+function nsedata_loaddata($bhavDate, $newfilename, $baseDir) {
+
+  $year = date('Y', $bhavDate);
+  $month = strtoupper(date('M', $bhavDate));
+  $day = date('d', $bhavDate);
+
+  $localDirectory = variable_get('file_public_path', conf_path() . '/files/') . "$baseDir/";
+  $extractFileName = $localDirectory . "cm$day$month$year" . "bhav.csv";
+  $zip = new ZipArchive();
+  $zip->open($newfilename);
+  $zip->extractTo($localDirectory);
+  $handle = fopen($extractFileName, 'r');
+  $header = fgetcsv($handle);
+
+  $i = 0;
+  while (($data = fgetcsv($handle, 300, ",")) !== FALSE) {
+    $i++;
+    $symbolid = _nsedata_get_symbolid($data[0]);
+    $seriesid = _nsedata_get_seriesid($data[1]);
+    $isinid = _nsedata_get_isinid($data[12], $symbolid, $seriesid);
+
+    $query = db_insert('nsedata')
+            ->fields(array(
+              'symbolid' => $symbolid,
+              'seriesid' => $seriesid,
+              'open' => $data[2],
+              'high' => $data[3],
+              'low' => $data[4],
+              'close' => $data[5],
+              'last' => $data[6],
+              'prevclose' => $data[7],
+              'tottrdqty' => $data[8],
+              'tottrdvol' => $data[9],
+              'trddate' => $bhavDate,
+              'totaltrades' => $data[11],
+              'isinid' => $isinid,
+            ))
+            ->execute();
+  }
+  $query = db_insert('nsedatasummary')
+          ->fields(array(
+            'trddate' => $bhavDate,
+            'nserows' => $i,
+          ))
+          ->execute();
+}
+
+/*
+ * Gets symbol id of the nsesymbol
+ */
+
+function _nsedata_get_symbolid($symbol) {
+  $query = db_select('nsesymbols', 'ns');
+  $query->addField('ns', 'id');
+  $query->condition('symbol', $symbol);
+  $result = $query->execute()->fetchAssoc();
+  $symbolid = $result['id'];
+
+  if (is_null($symbolid)) {
+    $query = db_insert('nsesymbols')
+            ->fields(array(
+              'symbol' => $symbol,
+              'description' => NULL,
+            ))
+            ->execute();
+    $symbolid = _nsedata_get_symbolid($symbol);
+  }
+  return $symbolid;
+}
+
+/*
+ * Gets series id nseseries
+ */
+
+function _nsedata_get_seriesid($series) {
+  $query = db_select('nseseries', 'ns');
+  $query->addField('ns', 'id');
+  $query->condition('series', $series);
+  $result = $query->execute()->fetchAssoc();
+  $seriesid = $result['id'];
+
+  if (is_null($seriesid)) {
+    $query = db_insert('nseseries')
+            ->fields(array(
+              'series' => $series,
+            ))
+            ->execute();
+    $seriesid = _nsedata_get_seriesid($series);
+  }
+
+  return $seriesid;
+}
+
+/*
+ * Gets isin id of the isin series
+ */
+
+function _nsedata_get_isinid($isin, $symbolid, $seriesid) {
+  $query = db_select('nseisin', 'ns');
+  $query->addField('ns', 'id');
+  $query->condition('isin', $isin);
+  $result = $query->execute()->fetchAssoc();
+  $isinid = $result['id'];
+
+  if (is_null($isinid)) {
+    $query = db_insert('nseisin')
+            ->fields(array(
+              'isin' => $isin,
+              'nsesymid' => $symbolid,
+              'nseseriesid' => $seriesid,
+            ))
+            ->execute();
+    $isinid = _nsedata_get_isinid($isin, $symbolid, $seriesid);
+  }
+
+  return $isinid;
+}
+
+/*
+ * Page callback, Implements nsedata/trade
+ */
+
+function nsedata_trade($form, &$form_state, $nsedata_symbol = 644) {
+  $form['symbol'] = array(
+    '#type' => 'select',
+    '#title' => 'Select the right symbol',
+    '#options' => _nsedata_get_symbollist(),
+    '#default_value' => $nsedata_symbol,
+  );
+
+  $form['series'] = array(
+    '#type' => 'select',
+    '#title' => 'Select the right series',
+    '#options' => _nsedata_get_serieslist(),
+    '#default_value' => 1,
+  );
+
+  $form['startdate'] = array(
+    '#type' => 'date',
+    '#title' => 'Select the start date',
+    '#default_value' => _nsedata_get_startdate(),
+  );
+
+  $form['enddate'] = array(
+    '#type' => 'date',
+    '#title' => 'Select the end date',
+    '#default_value' => _nsedata_get_enddate(),
+  );
+
+  $form['buyqty'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Select the buy quantity ',
+    '#default_value' => 1,
+  );
+
+  $form['buydiff'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Select the buy value difference',
+    '#default_value' => 1,
+  );
+
+  $form['sellqty'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Select the sell quantity',
+    '#default_value' => 1,
+  );
+
+  $form['selldiff'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Select the sell difference value',
+    '#default_value' => 1,
+  );
+
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+  if (isset($form_state['values']['result'])) {
+    $form['results'] = array(
+      '#markup' => $form_state['values']['result'],
+      '#prefix' => '<div>',
+      '#suffix' => '</div',
+    );
+  }
+
+  if (isset($form_state['values']['trade'])) {
+    $form['trade'] = array(
+      '#markup' => $form_state['values']['trade'],
+      '#prefix' => '<div>',
+      '#suffix' => '</div',
+    );
+  }
+  return $form;
+}
+
+/*
+ * Submit handler for form nsedata/trade
+ */
+
+function nsedata_trade_submit($form, &$form_state) {
+  $query = db_select('nsedata', 'nd');
+  $query->fields('nd');
+  $query->condition('nd.symbolid', $form_state['values']['symbol']);
+  $query->condition('nd.seriesid', $form_state['values']['series']);
+  $startdate = $form_state['values']['startdate'];
+  $starttime = mktime(0, 0, 0, $startdate['month'], $startdate['day'], $startdate['year']);
+  $enddate = $form_state['values']['enddate'];
+  $endtime = mktime(0, 0, 0, $enddate['month'], $enddate['day'], $enddate['year']);
+  $query->condition('nd.trddate', $starttime, '>=');
+  $query->condition('nd.trddate', $endtime, '<=');
+  $query->orderBy('nd.trddate', 'ASC');
+  $result = $query->execute()->fetchAllAssoc('trddate', PDO::FETCH_ASSOC);
+  $header = array('id', 'symid', 'serid', 'open', 'high', 'low', 'close', 'last', 'prevclose', 'totqty', 'totvol', 'trddate', 'tottrades', 'isinid', '');
+  $form_state['values']['result'] = theme('table', array('header' => $header, 'rows' => $result));
+  $et = new equityTrade();
+  $et->buyorderqty = $form_state['values']['buyqty'];
+  $et->buyorderdiff = $form_state['values']['buydiff'];
+  $et->sellorderqty = $form_state['values']['sellqty'];
+  $et->sellorderdiff = $form_state['values']['selldiff'];
+  foreach ($result as $trddate => $data) {
+    $et->createBuyOrders($data['prevclose'], $data['low'], $trddate);
+    $et->createSellOrders($data['prevclose'], $data['high'], $trddate);
+  }
+  $form_state['values']['trade'] = theme('equitytrade_summary', array('equitytrade' => $et));
+  $form_state['rebuild'] = TRUE;
+}
+
+/*
+ * Gets symbol list in an array
+ */
+
+function _nsedata_get_symbollist() {
+  $query = db_select('nsesymbols', 'ns');
+  $query->fields('ns', array('id', 'symbol'));
+  $result = $query->execute()->fetchAllKeyed(0, 1);
+  return $result;
+}
+
+/*
+ * Gets the series list as array
+ */
+
+function _nsedata_get_serieslist() {
+  $query = db_select('nseseries', 'ns');
+  $query->fields('ns', array('id', 'series'));
+  $result = $query->execute()->fetchAllKeyed();
+  return $result;
+}
+
+/*
+ * Gets the start date of the trading
+ */
+
+function _nsedata_get_startdate() {
+  $query = db_select('nsedatasummary', 'ns');
+  $query->addExpression('MIN(ns.trddate)', 'mindate');
+  $result = $query->execute()->fetchColumn();
+  $mindate = array(
+    'year' => date('Y', $result),
+    'month' => date('m', $result),
+    'day' => date('d', $result),
+  );
+  return $mindate;
+}
+
+/*
+ * Gets the end date for trading
+ */
+
+function _nsedata_get_enddate() {
+  $query = db_select('nsedatasummary', 'ns');
+  $query->addExpression('MAX(ns.trddate)', 'maxdate');
+  $result = $query->execute()->fetchColumn();
+  $maxdate = array(
+    'year' => date('Y', $result),
+    'month' => date('m', $result),
+    'day' => date('d', $result),
+  );
+  return $maxdate;
+}

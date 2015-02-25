@@ -1,0 +1,35 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/*
+ * Implements hook help
+ */
+
+function equitytrade_help($path) {
+  $output = "";
+  switch ($path) {
+    case 'equitytrade':
+      $output = "This will output value into the trade";
+      break;
+  }
+
+  return $output;
+}
+
+/*
+ *  Implements hook theme
+ */
+
+function equitytrade_theme() {
+  return array(
+    'equitytrade_summary' => array(
+      'variables' => array('equitytrade' => NULL),
+      'template' => 'equitytrade_summary',
+    )
+  );
+}

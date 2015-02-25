@@ -1,0 +1,91 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+function bhavcopydownload_schema() {
+  $schema['bhavcopydownload'] = array(
+    'description' => 'Stores the information about storing downloaded bhav copy data',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'description' => 'Primary Key of the downloaded data'
+      ),
+      'bhavtypeid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Stores the id of type of downloaded bhavcopy file'
+      ),
+      'bhavfilename' => array(
+        'type' => 'varchar',
+        'length' => 250,
+        'not null' => TRUE,
+        'description' => 'Stores the source bhav file name from where it
+                    is downloaded',
+      ),
+      'bhavstoredfilename' => array(
+        'type' => 'varchar',
+        'length' => 250,
+        'not null' => TRUE,
+        'description' => 'Stores the file name of the downloaded file'
+      ),
+      'bhavdate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'description' => 'Stores the date for which bhavcopy downloaded'
+      ),
+      'bhavdownloadeddate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'description' => 'Stores the date of downloading of the file'
+      ),
+      'success' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'size' => 'tiny',
+        'default' => 0,
+        'description' => 'Stores weather download successful or not',
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'bhavdate' => array('bhavdate')
+    ),
+  );
+
+  $schema['bhavtypes'] = array(
+    'description' => 'Stores information about bhavtypes',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'description' => 'primary key for bhavtype',
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 50,
+        'not null' => TRUE,
+        'description' => 'Name of the bhavtype'
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 200,
+        'description' => 'Notes about bhavtype',
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  return $schema;
+}

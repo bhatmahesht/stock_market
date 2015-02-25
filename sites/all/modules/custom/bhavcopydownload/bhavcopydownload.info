@@ -1,0 +1,4 @@
+name = Bhav Copy Download
+description = Downloads bhavcopy from data servers like NSE and BSE
+core = 7.x
+version = 7.1

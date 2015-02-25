@@ -1,0 +1,230 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/*
+ * Implements hook schema
+ */
+
+function nsedata_schema() {
+
+  $schema['nseseries'] = array(
+    'description' => 'Stores nse series types',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'description' => 'primary key',
+      ),
+      'series' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'description' => 'Different types of nseseries available'
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 200,
+        'description' => 'Remarks about nse series '
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'series' => array('series'),
+    ),
+  );
+
+  $schema['nsesymbols'] = array(
+    'description' => 'Stores nse symbols available',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'description' => 'Primary key',
+      ),
+      'symbol' => array(
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => 20,
+        'description' => ' nse symbols available'
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 100,
+        'description' => 'notes about each symbol'
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'symbol' => array('symbol'),
+    ),
+  );
+
+  $schema['nseisin'] = array(
+    'description' => 'Stores isin data for each stock',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'description' => 'Primary key',
+      ),
+      'isin' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'description' => 'unique isin number',
+      ),
+      'nsesymid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'nse symbold id'
+      ),
+      'nseseriesid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'nse series id',
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'isin' => array('isin'),
+    ),
+    'foreign keys' => array(
+      'symid' => array(
+        'table' => 'nsesymbols',
+        'columns' => array('nsesymbolid' => 'id'),
+      ),
+      'seriesid' => array(
+        'table' => 'nseseries',
+        'columns' => array('nseseriesid' => 'id'),
+      ),
+    ),
+  );
+
+  $schema['nsedatasummary'] = array(
+    'description' => 'stores summary of nsedata for each day',
+    'fields' => array(
+      'trddate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Traded date',
+      ),
+      'nserows' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'number of rows added',
+      )
+    ),
+    'primary key' => array('trddate'),
+    'foregin keys' => array(
+      'trddate' => array(
+        'table' => 'tradecalender',
+        'columns' => array('trddate' => 'trddate'),
+      ),
+    ),
+  );
+
+  $schema['nsedata'] = array(
+    'description' => 'stores downloaded bhavcopy data',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'description' => 'Primary key',
+      ),
+      'symbolid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'foreign key to nsesymbols table',
+      ),
+      'seriesid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'foreign key to nseseries table'
+      ),
+      'open' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'Open price',
+      ),
+      'high' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'high price',
+      ),
+      'low' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'low price',
+      ),
+      'close' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'close price',
+      ),
+      'last' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'last traded price',
+      ),
+      'prevclose' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'Previous close price',
+      ),
+      'tottrdqty' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Total trade quantity'
+      ),
+      'tottrdvol' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'Total traded volume in rupees',
+      ),
+      'trddate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Traded date also foreign key to Trade calender',
+      ),
+      'totaltrades' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Total number of trades happened'
+      ),
+      'isinid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Isin symbol for nse data',
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'trade' => array('symbolid', 'seriesid', 'trddate'),
+    ),
+    'indexes' => array(
+      'symbol' => array('symbolid'),
+      'tradedate' => array('trddate'),
+    ),
+    'foreign keys' => array(
+      'symbolid' => array(
+        'table' => 'nsesymbols',
+        'columns' => array('symbolid' => 'id'),
+      ),
+      'seriesid' => array(
+        'table' => 'nseseries',
+        'columns' => array('seriesid', 'id'),
+      ),
+      'trddate' => array(
+        'table' => 'tradecalender',
+        'columns' => array('trddate', 'trddate'),
+      ),
+      'isinid' => array(
+        'table' => 'nseisin',
+        'columns' => array('isinid', 'id'),
+      ),
+    ),
+  );
+
+  return $schema;
+}

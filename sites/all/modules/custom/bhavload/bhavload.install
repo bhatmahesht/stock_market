@@ -1,0 +1,174 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+function bhavload_schema() {
+
+  $schema['extract_history'] = array(
+    'description' => 'Stores the extraction history of files',
+    'fields' => array(
+      'bhavcopyid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'bhavcopy id of the extracted file',
+      ),
+      'extractdate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'extracted date of the bhavcopy file',
+      ),
+      'success' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => 'weather extraction successful or not'
+      ),
+    ),
+    'primary key' => array('bhavcopyid'),
+    'foreign keys' => array(
+      'bhavcopyfile' => array(
+        'table' => 'bhavcopydownload',
+        'columns' => array('bhavcopyid' => 'id'),
+      ),
+    ),
+  );
+
+  $schema['nsesymbols'] = array(
+    'description' => 'Stores all nse symbols available',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'primary key ',
+      ),
+      'symbol' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'description' => 'nse symbol for the stock',
+      ),
+      'isin' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'description' => 'isin value for a particular company',
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'symbol' => array('symbol'),
+      'isin' => array('isin'),
+    ),
+    'indexes' => array(
+      'symbol' => array('symbol'),
+    ),
+  );
+
+  $schema['nseseries'] = array(
+    'description' => 'Stores information about nse series',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'primary key',
+      ),
+      'series' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'description' => 'Name of the nse series available',
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'series' => array('series'),
+    ),
+  );
+
+  $schema['nsedata'] = array(
+    'description' => 'stores downloaded bhavcopy data into table',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'primary key'
+      ),
+      'symbolid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Symbol id from nsesymbols table',
+      ),
+      'seriesid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Series id from the nseseries table',
+      ),
+      'open' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'Open value at the nse exchange',
+      ),
+      'high' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'High value at the nse exchange',
+      ),
+      'low' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'low value at the nse exchange',
+      ),
+      'close' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'closing value at the nse exchange',
+      ),
+      'prevclose' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'previous close value at the nse exchange',
+      ),
+      'tottrdqty' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'total traded quantity at the nse exchange',
+      ),
+      'tottrdvol' => array(
+        'type' => 'float',
+        'not null' => TRUE,
+        'description' => 'total traded volume at the nse exchange',
+      ),
+      'trddate' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'traded date at the nse exchange',
+      ),
+      'totaltrades' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'total trades happened at the nse exchange',
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'nsesymbols' => array('symbolid', 'seriesid', 'trddate'),
+    ),
+    'foreign keys' => array(
+      'symbol' => array(
+        'table' => 'nsesymbols',
+        'columns' => array('symbolid' => 'id'),
+      ),
+      'series' => array(
+        'table' => 'nseseries',
+        'columns' => array('seriesid' => 'id')
+      ),
+    ),
+  );
+
+  return $schema;
+}
